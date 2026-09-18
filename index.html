@@ -4,6 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dnevna iskra - Dnevni navdih in znanje</title>
+    <!-- Favicon / ikona za zaznamke in domači zaslon -->
+    <link rel="icon" type="image/png" href="https://placehold.co/64x64/f59e0b/ffffff?text=%E2%9A%A1">
+    <link rel="apple-touch-icon" href="https://placehold.co/192x192/f59e0b/ffffff?text=Iskra">
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
@@ -61,7 +64,7 @@
                 <!-- PWA Install Button -->
                 <button id="pwaInstallBtn" onclick="app.installPWA()" class="hidden sm:flex items-center space-x-1 px-3 py-1.5 rounded-lg text-xs font-medium bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 hover:bg-amber-200 transition">
                     <i class="fa-solid fa-download"></i>
-                    <span>Namesti PWA</span>
+                    <span>Namesti aplikacijo</span>
                 </button>
 
                 <!-- Dark Mode Toggle -->
@@ -180,8 +183,13 @@
             <!-- Categories horizontal scroll -->
             <div class="space-y-2">
                 <label class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Kategorije</label>
-                <div id="categoryChips" class="flex items-center space-x-2 overflow-x-auto pb-2 hide-scrollbar">
-                    <!-- Chips inserted dynamically -->
+                <div class="flex items-center space-x-2">
+                    <div id="categoryChips" class="flex items-center space-x-2 overflow-x-auto pb-2 hide-scrollbar flex-1">
+                        <!-- Chips inserted dynamically -->
+                    </div>
+                    <button onclick="app.addCustomCategory()" title="Dodaj svojo kategorijo" class="flex-shrink-0 w-8 h-8 rounded-full border border-dashed border-amber-400 text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-950/40 flex items-center justify-center transition">
+                        <i class="fa-solid fa-plus text-xs"></i>
+                    </button>
                 </div>
             </div>
         </section>
@@ -260,6 +268,15 @@
                     <span>Zahtevani model:</span>
                     <code class="px-2 py-1 rounded bg-slate-100 dark:bg-slate-800 font-mono text-amber-600 dark:text-amber-400">gemini-3.1-flash-lite</code>
                 </div>
+
+                <div class="pt-4 border-t border-slate-100 dark:border-slate-800">
+                    <label class="block text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider mb-2">
+                        Glas bralca (Poslušaj)
+                    </label>
+                    <select id="voiceSelect" onchange="app.saveVoice()" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500">
+                        <option value="">Privzeti glas naprave</option>
+                    </select>
+                </div>
             </div>
 
             <!-- Modal footer buttons -->
@@ -299,7 +316,11 @@
                 --
             </div>
 
-            <div class="flex items-center justify-between pt-4 border-t border-slate-100 dark:border-slate-800">
+            <div class="flex items-center justify-between pt-4 border-t border-slate-100 dark:border-slate-800 flex-wrap gap-2">
+                <button id="detailTtsBtn" onclick="app.toggleDetailSpeech()" class="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-800 text-xs font-medium text-slate-600 dark:text-slate-300 hover:text-amber-500 flex items-center space-x-2">
+                    <i id="detailTtsIcon" class="fa-solid fa-volume-high"></i>
+                    <span id="detailTtsText">Poslušaj</span>
+                </button>
                 <button id="detailFavBtn" onclick="app.toggleDetailFav()" class="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-800 text-xs font-medium text-slate-600 dark:text-slate-300 hover:text-amber-500 flex items-center space-x-2">
                     <i id="detailFavIcon" class="fa-regular fa-bookmark"></i>
                     <span>Priljubljeno</span>
@@ -410,13 +431,80 @@
                 this.deferredInstallPrompt = null;
                 this.speechSynth = window.speechSynthesis;
                 this.isSpeaking = false;
+                this.speechTarget = null; // 'today' ali 'detail'
+                this.customCategories = JSON.parse(localStorage.getItem('dnevna_iskra_custom_categories')) || [];
+                this.selectedVoiceURI = localStorage.getItem('dnevna_iskra_voice') || '';
+                this.availableVoices = [];
 
                 this.initTheme();
                 this.initPWA();
+                this.initVoices();
                 this.renderCategories();
                 this.checkDailyAutoGenerate();
                 this.renderHistory();
                 this.updateApiKeyBadge();
+            }
+
+            // Vrne osnovne + ročno dodane kategorije
+            getAllCategories() {
+                return [...CATEGORIES, ...this.customCategories];
+            }
+
+            addCustomCategory() {
+                const name = prompt('Vnesi ime nove kategorije:');
+                if (!name) return;
+                const trimmed = name.trim();
+                if (!trimmed) return;
+                if (this.getAllCategories().some(c => c.toLowerCase() === trimmed.toLowerCase())) {
+                    this.showToast('Ta kategorija že obstaja.', 'warning');
+                    return;
+                }
+                this.customCategories.push(trimmed);
+                localStorage.setItem('dnevna_iskra_custom_categories', JSON.stringify(this.customCategories));
+                this.renderCategories();
+                this.showToast('Kategorija dodana!', 'success');
+            }
+
+            removeCustomCategory(cat) {
+                this.customCategories = this.customCategories.filter(c => c !== cat);
+                localStorage.setItem('dnevna_iskra_custom_categories', JSON.stringify(this.customCategories));
+                if (this.selectedCategory === cat) {
+                    this.selectedCategory = "Vse kategorije";
+                }
+                this.renderCategories();
+                this.filterHistory();
+            }
+
+            // --- Glas bralca (TTS) ---
+            initVoices() {
+                const load = () => {
+                    this.availableVoices = this.speechSynth.getVoices();
+                };
+                load();
+                if (typeof this.speechSynth.onvoiceschanged !== 'undefined') {
+                    this.speechSynth.onvoiceschanged = load;
+                }
+            }
+
+            populateVoiceOptions() {
+                const select = document.getElementById('voiceSelect');
+                const voices = this.availableVoices.length ? this.availableVoices : this.speechSynth.getVoices();
+                select.innerHTML = '<option value="">Privzeti glas naprave</option>' + voices.map(v => `
+                    <option value="${v.voiceURI}" ${v.voiceURI === this.selectedVoiceURI ? 'selected' : ''}>${v.name} (${v.lang})</option>
+                `).join('');
+            }
+
+            saveVoice() {
+                const select = document.getElementById('voiceSelect');
+                this.selectedVoiceURI = select.value;
+                localStorage.setItem('dnevna_iskra_voice', this.selectedVoiceURI);
+                this.showToast('Glas bralca shranjen!', 'success');
+            }
+
+            getSelectedVoice() {
+                if (!this.selectedVoiceURI) return null;
+                const voices = this.availableVoices.length ? this.availableVoices : this.speechSynth.getVoices();
+                return voices.find(v => v.voiceURI === this.selectedVoiceURI) || null;
             }
 
             initTheme() {
@@ -468,14 +556,16 @@
 
             renderCategories() {
                 const container = document.getElementById('categoryChips');
-                container.innerHTML = CATEGORIES.map(cat => {
+                container.innerHTML = this.getAllCategories().map(cat => {
                     const active = cat === this.selectedCategory;
+                    const isCustom = this.customCategories.includes(cat);
                     const activeClasses = active 
                         ? 'bg-amber-500 text-white shadow-md shadow-amber-500/20' 
                         : 'bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800';
+                    const removeBtn = isCustom ? `<i onclick="event.stopPropagation(); app.removeCustomCategory('${cat.replace(/'/g, "\\'")}')" class="fa-solid fa-xmark ml-1.5 opacity-60 hover:opacity-100"></i>` : '';
                     return `
-                        <button onclick="app.selectCategory('${cat.replace(/'/g, "\\'")}')" class="px-3.5 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all ${activeClasses}">
-                            ${cat}
+                        <button onclick="app.selectCategory('${cat.replace(/'/g, "\\'")}')" class="px-3.5 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all flex items-center ${activeClasses}">
+                            ${cat}${removeBtn}
                         </button>
                     `;
                 }).join('');
@@ -502,7 +592,8 @@
                 document.getElementById('cardSkeleton').classList.remove('hidden');
                 document.getElementById('cardContent').classList.add('hidden');
 
-                const chosenCat = forcedCategory || (this.selectedCategory !== "Vse kategorije" ? this.selectedCategory : CATEGORIES[Math.floor(Math.random() * (CATEGORIES.length - 1)) + 1]);
+                const allCats = this.getAllCategories();
+                const chosenCat = forcedCategory || (this.selectedCategory !== "Vse kategorije" ? this.selectedCategory : allCats[Math.floor(Math.random() * (allCats.length - 1)) + 1]);
 
                 // Context of recent titles to avoid duplicates
                 const recentTitles = this.items.slice(0, 20).map(i => i.naslov).join('; ');
@@ -695,29 +786,71 @@ ODGOVOR MORA BITI IZKLJUČNO V VELJAVNEM JSON FORMATU s strukturo:
                 document.body.removeChild(textarea);
             }
 
-            toggleSpeech() {
-                if (!this.currentTodayItem) return;
+            // Ponastavi gumb za poslušanje na dano stanje (ikone/besedilo)
+            resetSpeechButton(target) {
+                const icon = target === 'today' ? document.getElementById('ttsIcon') : document.getElementById('detailTtsIcon');
+                const text = target === 'today' ? document.getElementById('ttsText') : document.getElementById('detailTtsText');
+                if (icon) icon.className = "fa-solid fa-volume-high";
+                if (text) text.innerText = "Poslušaj";
+            }
 
+            speak(text, target) {
+                // Ustavi morebitno tekoče predvajanje (na tem ali drugem gumbu)
                 if (this.isSpeaking) {
                     this.speechSynth.cancel();
-                    this.isSpeaking = false;
-                    document.getElementById('ttsIcon').className = "fa-solid fa-volume-high";
-                    document.getElementById('ttsText').innerText = "Poslušaj";
+                    this.resetSpeechButton(this.speechTarget);
+                }
+
+                const utterance = new SpeechSynthesisUtterance(text);
+                const voice = this.getSelectedVoice();
+                if (voice) {
+                    utterance.voice = voice;
+                    utterance.lang = voice.lang;
                 } else {
-                    const utterance = new SpeechSynthesisUtterance(this.currentTodayItem.naslov + ". " + this.currentTodayItem.vsebina);
                     utterance.lang = 'sl-SI';
-                    utterance.rate = 0.95;
+                }
+                utterance.rate = 0.95;
 
-                    utterance.onend = () => {
-                        this.isSpeaking = false;
-                        document.getElementById('ttsIcon').className = "fa-solid fa-volume-high";
-                        document.getElementById('ttsText').innerText = "Poslušaj";
-                    };
+                utterance.onend = () => {
+                    this.isSpeaking = false;
+                    this.speechTarget = null;
+                    this.resetSpeechButton(target);
+                };
 
-                    this.speechSynth.speak(utterance);
-                    this.isSpeaking = true;
-                    document.getElementById('ttsIcon').className = "fa-solid fa-square-stop text-amber-500";
-                    document.getElementById('ttsText').innerText = "Ustavi";
+                this.speechSynth.speak(utterance);
+                this.isSpeaking = true;
+                this.speechTarget = target;
+
+                const icon = target === 'today' ? document.getElementById('ttsIcon') : document.getElementById('detailTtsIcon');
+                const textEl = target === 'today' ? document.getElementById('ttsText') : document.getElementById('detailTtsText');
+                icon.className = "fa-solid fa-square-stop text-amber-500";
+                textEl.innerText = "Ustavi";
+            }
+
+            stopSpeech() {
+                if (this.isSpeaking) {
+                    this.speechSynth.cancel();
+                    this.resetSpeechButton(this.speechTarget);
+                    this.isSpeaking = false;
+                    this.speechTarget = null;
+                }
+            }
+
+            toggleSpeech() {
+                if (!this.currentTodayItem) return;
+                if (this.isSpeaking && this.speechTarget === 'today') {
+                    this.stopSpeech();
+                } else {
+                    this.speak(this.currentTodayItem.naslov + ". " + this.currentTodayItem.vsebina, 'today');
+                }
+            }
+
+            toggleDetailSpeech() {
+                if (!this.activeDetailItem) return;
+                if (this.isSpeaking && this.speechTarget === 'detail') {
+                    this.stopSpeech();
+                } else {
+                    this.speak(this.activeDetailItem.naslov + ". " + this.activeDetailItem.vsebina, 'detail');
                 }
             }
 
@@ -829,6 +962,9 @@ ODGOVOR MORA BITI IZKLJUČNO V VELJAVNEM JSON FORMATU s strukturo:
             }
 
             closeDetailModal() {
+                if (this.isSpeaking && this.speechTarget === 'detail') {
+                    this.stopSpeech();
+                }
                 document.getElementById('detailModal').classList.add('hidden');
                 this.activeDetailItem = null;
             }
@@ -856,6 +992,7 @@ ODGOVOR MORA BITI IZKLJUČNO V VELJAVNEM JSON FORMATU s strukturo:
 
             openSettingsModal() {
                 document.getElementById('apiKeyInput').value = this.apiKey;
+                this.populateVoiceOptions();
                 document.getElementById('settingsModal').classList.remove('hidden');
             }
 
