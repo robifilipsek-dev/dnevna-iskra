@@ -1,0 +1,924 @@
+<!DOCTYPE html>
+<html lang="sl" class="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dnevna iskra - Dnevni navdih in znanje</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        amber: { 500: '#f59e0b', 600: '#d97706' },
+                        brand: {
+                            50: '#fffbe interior',
+                            500: '#f59e0b',
+                            600: '#d97706',
+                            700: '#b45309'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Google Fonts Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .glass-card {
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+        }
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+</head>
+<body class="bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-100 min-h-screen flex flex-col transition-colors duration-300">
+
+    <!-- Header / Navbar -->
+    <header class="sticky top-0 z-30 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 transition-colors">
+        <div class="max-w-4xl mx-auto px-4 h-16 flex items-center justify-between">
+            <div class="flex items-center space-x-3 cursor-pointer" onclick="app.showTab('home')">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-amber-500 to-orange-500 flex items-center justify-center text-white shadow-md shadow-amber-500/20">
+                    <i class="fa-solid fa-bolt text-xl"></i>
+                </div>
+                <div>
+                    <h1 class="font-bold text-lg leading-tight tracking-tight text-slate-900 dark:text-white">Dnevna iskra</h1>
+                    <p class="text-xs text-slate-500 dark:text-slate-400">Dnevna porcija modrosti</p>
+                </div>
+            </div>
+
+            <!-- Header actions -->
+            <div class="flex items-center space-x-2">
+                <!-- PWA Install Button -->
+                <button id="pwaInstallBtn" onclick="app.installPWA()" class="hidden sm:flex items-center space-x-1 px-3 py-1.5 rounded-lg text-xs font-medium bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 hover:bg-amber-200 transition">
+                    <i class="fa-solid fa-download"></i>
+                    <span>Namesti PWA</span>
+                </button>
+
+                <!-- Dark Mode Toggle -->
+                <button onclick="app.toggleTheme()" class="p-2.5 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition">
+                    <i id="themeIcon" class="fa-solid fa-moon text-lg"></i>
+                </button>
+
+                <!-- Settings Button -->
+                <button onclick="app.openSettingsModal()" class="p-2.5 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition relative">
+                    <i class="fa-solid fa-gear text-lg"></i>
+                    <span id="apiKeyBadge" class="absolute top-2 right-2 w-2 h-2 rounded-full bg-red-500"></span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="flex-1 max-w-4xl w-full mx-auto px-4 py-6 space-y-8">
+
+        <!-- Banner for API key prompt if missing -->
+        <div id="noApiKeyBanner" class="hidden p-4 rounded-2xl bg-gradient-to-r from-amber-500/10 via-orange-500/10 to-red-500/10 border border-amber-500/30 text-amber-900 dark:text-amber-200 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div class="flex items-center space-x-3">
+                <i class="fa-solid fa-key text-amber-500 text-xl flex-shrink-0"></i>
+                <div class="text-sm">
+                    <strong class="font-semibold">Vnesite Gemini API ključ!</strong>
+                    <p class="text-xs text-slate-600 dark:text-slate-400">Za generiranje novih izvirnih isker prek Gemini API-ja vnesite svoj brezplačni ključ.</p>
+                </div>
+            </div>
+            <button onclick="app.openSettingsModal()" class="w-full sm:w-auto px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white font-medium text-xs rounded-xl shadow transition">
+                Nastavi ključ
+            </button>
+        </div>
+
+        <!-- Today's Spark Card -->
+        <section id="todaysSparkSection" class="relative">
+            <div class="flex items-center justify-between mb-3">
+                <span class="inline-flex items-center space-x-2 text-xs font-semibold uppercase tracking-wider text-amber-600 dark:text-amber-400">
+                    <span class="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
+                    <span>Iskra dneva</span>
+                </span>
+                <span id="todaysDate" class="text-xs text-slate-400 font-medium">--</span>
+            </div>
+
+            <!-- Card Container -->
+            <div id="todayCard" class="relative rounded-3xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xl shadow-slate-200/50 dark:shadow-none p-6 sm:p-8 transition-all duration-300">
+                <!-- Skeleton Loader -->
+                <div id="cardSkeleton" class="animate-pulse space-y-4">
+                    <div class="h-6 bg-slate-200 dark:bg-slate-800 rounded-lg w-1/4"></div>
+                    <div class="h-8 bg-slate-200 dark:bg-slate-800 rounded-lg w-3/4"></div>
+                    <div class="space-y-2 pt-2">
+                        <div class="h-4 bg-slate-200 dark:bg-slate-800 rounded w-full"></div>
+                        <div class="h-4 bg-slate-200 dark:bg-slate-800 rounded w-5/6"></div>
+                        <div class="h-4 bg-slate-200 dark:bg-slate-800 rounded w-4/6"></div>
+                    </div>
+                </div>
+
+                <!-- Card Content -->
+                <div id="cardContent" class="hidden space-y-6">
+                    <div class="flex flex-wrap items-center justify-between gap-2">
+                        <span id="sparkCategory" class="px-3 py-1 rounded-full text-xs font-semibold bg-amber-100 dark:bg-amber-950/80 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
+                            Kategorija
+                        </span>
+                        <div class="flex items-center space-x-3 text-slate-400 text-xs">
+                            <span id="sparkReadTime"><i class="fa-regular fa-clock mr-1"></i> ~1 min</span>
+                        </div>
+                    </div>
+
+                    <h2 id="sparkTitle" class="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white leading-snug">
+                        Naslov iskre
+                    </h2>
+
+                    <div id="sparkBody" class="text-slate-600 dark:text-slate-300 text-base leading-relaxed space-y-3 font-normal">
+                        Vsebina...
+                    </div>
+
+                    <!-- Keywords -->
+                    <div id="sparkKeywords" class="flex flex-wrap gap-2 pt-2">
+                        <!-- Key terms -->
+                    </div>
+
+                    <!-- Card Actions -->
+                    <div class="pt-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-3">
+                        <button id="ttsBtn" onclick="app.toggleSpeech()" class="px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-medium hover:bg-slate-200 dark:hover:bg-slate-700 transition flex items-center space-x-2">
+                            <i id="ttsIcon" class="fa-solid fa-volume-high"></i>
+                            <span id="ttsText">Poslušaj</span>
+                        </button>
+
+                        <div class="flex items-center space-x-2">
+                            <button id="favBtn" onclick="app.toggleFavoriteToday()" class="p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 text-slate-500 hover:text-amber-500 dark:hover:text-amber-400 transition">
+                                <i id="favIcon" class="fa-regular fa-bookmark text-lg"></i>
+                            </button>
+                            <button onclick="app.shareSparkToday()" class="p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 text-slate-500 hover:text-blue-500 dark:hover:text-blue-400 transition">
+                                <i class="fa-solid fa-share-nodes text-lg"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Generate & Category Selector -->
+        <section class="space-y-4">
+            <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
+                <button onclick="app.generateNewSpark()" id="generateBtn" class="px-6 py-3.5 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-semibold text-sm shadow-lg shadow-amber-500/25 flex items-center justify-center space-x-2 transition transform active:scale-95">
+                    <i class="fa-solid fa-wand-magic-sparkles"></i>
+                    <span>Generiraj nov navdih</span>
+                </button>
+
+                <!-- Model Badge Info -->
+                <div class="flex items-center justify-center space-x-2 px-3 py-1.5 rounded-xl bg-slate-200/60 dark:bg-slate-800/60 text-xs text-slate-500 dark:text-slate-400">
+                    <i class="fa-solid fa-microchip text-amber-500"></i>
+                    <span>Model: <strong class="text-slate-700 dark:text-slate-200">gemini-3.1-flash-lite</strong></span>
+                </div>
+            </div>
+
+            <!-- Categories horizontal scroll -->
+            <div class="space-y-2">
+                <label class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Kategorije</label>
+                <div id="categoryChips" class="flex items-center space-x-2 overflow-x-auto pb-2 hide-scrollbar">
+                    <!-- Chips inserted dynamically -->
+                </div>
+            </div>
+        </section>
+
+        <!-- History / Archive Section -->
+        <section class="space-y-4 pt-4 border-t border-slate-200 dark:border-slate-800">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                    <h3 class="text-xl font-bold text-slate-900 dark:text-white">Zgodovina in Priljubljene</h3>
+                    <p class="text-xs text-slate-500">Shranjeno zadnjih ~60 isker</p>
+                </div>
+
+                <!-- Search and filter -->
+                <div class="flex items-center space-x-2">
+                    <div class="relative flex-1 sm:w-64">
+                        <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                        <input type="text" id="searchInput" oninput="app.filterHistory()" placeholder="Išči po naslovu ali vsebini..." class="w-full pl-8 pr-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-amber-500">
+                    </div>
+                    <button id="favFilterBtn" onclick="app.toggleFavFilter()" class="p-2 rounded-xl border border-slate-200 dark:border-slate-800 text-xs font-medium bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 hover:text-amber-500 transition flex items-center space-x-1">
+                        <i class="fa-solid fa-bookmark"></i>
+                        <span class="hidden sm:inline">Priljubljene</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- History Grid -->
+            <div id="historyGrid" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <!-- History cards inserted dynamically -->
+            </div>
+
+            <!-- Empty State -->
+            <div id="emptyHistory" class="hidden text-center py-12 space-y-3">
+                <i class="fa-regular fa-folder-open text-4xl text-slate-300 dark:text-slate-700"></i>
+                <p class="text-slate-500 text-sm">Ni najdenih vnosov.</p>
+            </div>
+        </section>
+    </main>
+
+    <!-- Settings Modal -->
+    <div id="settingsModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm hidden transition-opacity">
+        <div class="bg-white dark:bg-slate-900 w-full max-w-md rounded-3xl p-6 space-y-6 shadow-2xl border border-slate-200 dark:border-slate-800">
+            <div class="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-4">
+                <div class="flex items-center space-x-2">
+                    <i class="fa-solid fa-sliders text-amber-500 text-lg"></i>
+                    <h3 class="font-bold text-lg text-slate-900 dark:text-white">Nastavitve</h3>
+                </div>
+                <button onclick="app.closeSettingsModal()" class="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
+                    <i class="fa-solid fa-xmark text-xl"></i>
+                </button>
+            </div>
+
+            <!-- API Key form -->
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider mb-2">
+                        Google Gemini API Ključ
+                    </label>
+                    <div class="relative">
+                        <input type="password" id="apiKeyInput" placeholder="AIzaSy..." class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 pr-10">
+                        <button type="button" onclick="app.toggleKeyVisibility()" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                            <i id="eyeIcon" class="fa-solid fa-eye"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 text-xs space-y-1">
+                    <p class="font-semibold"><i class="fa-solid fa-circle-info mr-1"></i> Kako do ključa?</p>
+                    <p>Za pridobitev brezplačnega API ključa obiščite Google AI Studio:</p>
+                    <a href="https://aistudio.google.com/app/api-keys" target="_blank" class="inline-flex items-center space-x-1 text-amber-600 dark:text-amber-400 font-bold underline hover:text-amber-700 pt-1">
+                        <span>Pridobi ključ v Google AI Studio</span>
+                        <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i>
+                    </a>
+                </div>
+
+                <div class="pt-2 flex items-center justify-between text-xs text-slate-500">
+                    <span>Zahtevani model:</span>
+                    <code class="px-2 py-1 rounded bg-slate-100 dark:bg-slate-800 font-mono text-amber-600 dark:text-amber-400">gemini-3.1-flash-lite</code>
+                </div>
+            </div>
+
+            <!-- Modal footer buttons -->
+            <div class="flex items-center justify-end space-x-3 border-t border-slate-100 dark:border-slate-800 pt-4">
+                <button onclick="app.closeSettingsModal()" class="px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800">
+                    Prekliči
+                </button>
+                <button onclick="app.saveApiKey()" class="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-medium text-xs shadow-md shadow-amber-500/20">
+                    Shrani ključ
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Detail View Modal -->
+    <div id="detailModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm hidden transition-opacity">
+        <div class="bg-white dark:bg-slate-900 w-full max-w-2xl rounded-3xl p-6 sm:p-8 space-y-6 shadow-2xl border border-slate-200 dark:border-slate-800 max-h-[90vh] overflow-y-auto">
+            <div class="flex items-center justify-between">
+                <span id="detailCategory" class="px-3 py-1 rounded-full text-xs font-semibold bg-amber-100 dark:bg-amber-950/80 text-amber-700 dark:text-amber-300">
+                    Kategorija
+                </span>
+                <button onclick="app.closeDetailModal()" class="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
+                    <i class="fa-solid fa-xmark text-xl"></i>
+                </button>
+            </div>
+
+            <div class="space-y-2">
+                <p id="detailDate" class="text-xs text-slate-400">--</p>
+                <h3 id="detailTitle" class="text-2xl font-bold text-slate-900 dark:text-white">--</h3>
+            </div>
+
+            <div id="detailBody" class="text-slate-600 dark:text-slate-300 text-base leading-relaxed space-y-3">
+                --
+            </div>
+
+            <div id="detailKeywords" class="flex flex-wrap gap-2 pt-2">
+                --
+            </div>
+
+            <div class="flex items-center justify-between pt-4 border-t border-slate-100 dark:border-slate-800">
+                <button id="detailFavBtn" onclick="app.toggleDetailFav()" class="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-800 text-xs font-medium text-slate-600 dark:text-slate-300 hover:text-amber-500 flex items-center space-x-2">
+                    <i id="detailFavIcon" class="fa-regular fa-bookmark"></i>
+                    <span>Priljubljeno</span>
+                </button>
+                <button onclick="app.copyDetailText()" class="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-200">
+                    <i class="fa-regular fa-copy mr-1"></i> Kopiraj besedilo
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification Container -->
+    <div id="toastContainer" class="fixed bottom-6 right-6 z-50 space-y-2 pointer-events-none"></div>
+
+    <script>
+        // Service Worker setup via Blob
+        const swCode = `
+            const CACHE_NAME = 'dnevna-iskra-v1';
+            self.addEventListener('install', (e) => {
+                self.skipWaiting();
+            });
+            self.addEventListener('activate', (e) => {
+                e.waitUntil(clients.claim());
+            });
+            self.addEventListener('fetch', (e) => {
+                e.respondWith(
+                    fetch(e.request).catch(() => caches.match(e.request))
+                );
+            });
+        `;
+        const swBlob = new Blob([swCode], { type: 'application/javascript' });
+        const swUrl = URL.createObjectURL(swBlob);
+
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register(swUrl).catch(err => console.log('SW reg error:', err));
+        }
+
+        // Manifest setup via Blob
+        const manifestObj = {
+            name: "Dnevna iskra",
+            short_name: "Iskra",
+            start_url: "./",
+            display: "standalone",
+            background_color: "#0f172a",
+            theme_color: "#f59e0b",
+            icons: [
+                {
+                    src: "https://placehold.co/192x192/f59e0b/ffffff?text=Iskra",
+                    sizes: "192x192",
+                    type: "image/png"
+                },
+                {
+                    src: "https://placehold.co/512x512/f59e0b/ffffff?text=Iskra",
+                    sizes: "512x512",
+                    type: "image/png"
+                }
+            ]
+        };
+        const manifestBlob = new Blob([JSON.stringify(manifestObj)], { type: 'application/json' });
+        const manifestUrl = URL.createObjectURL(manifestBlob);
+        const link = document.createElement('link');
+        link.rel = 'manifest';
+        link.href = manifestUrl;
+        document.head.appendChild(link);
+
+        const CATEGORIES = [
+            "Vse kategorije",
+            "Zanimivosti o življenju in naravi",
+            "Modrosti / nasveti za boljše življenje",
+            "Kako deluje človeško telo (fiziologija)",
+            "Kako delujejo možgani (nevroznanost)",
+            "Nasveti o odnosih in komunikaciji",
+            "Poslovni nasveti in produktivnost",
+            "Zgodovina, Znanost in Psihologija"
+        ];
+
+        // Sample initial offline dataset
+        const SAMPLE_SPARKS = [
+            {
+                id: "sample-1",
+                date: new Date().toISOString().split('T')[0],
+                kategorija: "Kako delujejo možgani (nevroznanost)",
+                naslov: "Moč nevroplastičnosti: Možgani se spreminjajo do konca življenja",
+                vsebina: "Nevroplastičnost je sposobnost možganov, da skozi celotno življenje ustvarjajo nove živčne povezave in se prilagajajo novim izkušnjam. Dolgo je veljalo prepričanje, da se po odraslosti možgani ne razvijajo več, vendar sodobna nevroznanost dokazuje nasprotno. Ko se učite novega jezika, igranja instrumenta ali nove veščine, fizično spreminjate strukturo svojega možganskega tkiva. Ključ do ohranjanja vitalnosti možganov v starosti sta stalna radovednost in namerno izstopanje iz cone udobja. Vsak nov izziv deluje kot trening za vaše možganske sinapse.",
+                kljucne_besede: ["nevroplastičnost", "možgani", "učenje", "kognicija"],
+                favorite: true
+            },
+            {
+                id: "sample-2",
+                date: "2026-09-17",
+                kategorija: "Modrosti / nasveti za boljše življenje",
+                naslov: "Pravilo 2 minut za premagovanje odlašanja",
+                vsebina: "Če vam kakšno opravilo vzame manj kot dve minuti, ga opravite takoj. To preprosto pravilo iz metodologije produktivnosti preprečuje nabiranje drobnih opravil, ki povzročajo kognitivno preobremenitev. Pospravljanje mize, odgovor na kratek e-mail ali zalivanje rože vzamejo le trenutek, a njihovo odlašanje ustvarja nepotreben psihološki pritisk. Ko začnete majhna opravila reševati takoj, ustvarite zamah pozitivne energije, ki vas nato spodbudi k reševanju večjih in zahtevnejših ciljev v dnevu.",
+                kljucne_besede: ["produktivnost", "navade", "fokus", "čas"],
+                favorite: false
+            }
+        ];
+
+        class App {
+            constructor() {
+                this.apiKey = localStorage.getItem('dnevna_iskra_apikey') || '';
+                this.items = JSON.parse(localStorage.getItem('dnevna_iskra_items')) || SAMPLE_SPARKS;
+                this.lastGeneratedDate = localStorage.getItem('dnevna_iskra_last_gen') || '';
+                this.selectedCategory = "Vse kategorije";
+                this.favFilterActive = false;
+                this.currentTodayItem = null;
+                this.activeDetailItem = null;
+                this.deferredInstallPrompt = null;
+                this.speechSynth = window.speechSynthesis;
+                this.isSpeaking = false;
+
+                this.initTheme();
+                this.initPWA();
+                this.renderCategories();
+                this.checkDailyAutoGenerate();
+                this.renderHistory();
+                this.updateApiKeyBadge();
+            }
+
+            initTheme() {
+                const savedTheme = localStorage.getItem('dnevna_iskra_theme');
+                if (savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                    document.documentElement.classList.add('dark');
+                    document.getElementById('themeIcon').className = 'fa-solid fa-sun text-lg text-amber-400';
+                } else {
+                    document.documentElement.classList.remove('dark');
+                    document.getElementById('themeIcon').className = 'fa-solid fa-moon text-lg';
+                }
+            }
+
+            toggleTheme() {
+                const isDark = document.documentElement.classList.toggle('dark');
+                localStorage.setItem('dnevna_iskra_theme', isDark ? 'dark' : 'light');
+                document.getElementById('themeIcon').className = isDark ? 'fa-solid fa-sun text-lg text-amber-400' : 'fa-solid fa-moon text-lg';
+            }
+
+            initPWA() {
+                window.addEventListener('beforeinstallprompt', (e) => {
+                    e.preventDefault();
+                    this.deferredInstallPrompt = e;
+                    document.getElementById('pwaInstallBtn').classList.remove('hidden');
+                });
+            }
+
+            installPWA() {
+                if (this.deferredInstallPrompt) {
+                    this.deferredInstallPrompt.prompt();
+                    this.deferredInstallPrompt.userChoice.then(() => {
+                        this.deferredInstallPrompt = null;
+                        document.getElementById('pwaInstallBtn').classList.add('hidden');
+                    });
+                }
+            }
+
+            updateApiKeyBadge() {
+                const badge = document.getElementById('apiKeyBadge');
+                const banner = document.getElementById('noApiKeyBanner');
+                if (this.apiKey && this.apiKey.trim().length > 5) {
+                    badge.className = "absolute top-2 right-2 w-2.5 h-2.5 rounded-full bg-emerald-500";
+                    banner.classList.add('hidden');
+                } else {
+                    badge.className = "absolute top-2 right-2 w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse";
+                    banner.classList.remove('hidden');
+                }
+            }
+
+            renderCategories() {
+                const container = document.getElementById('categoryChips');
+                container.innerHTML = CATEGORIES.map(cat => {
+                    const active = cat === this.selectedCategory;
+                    const activeClasses = active 
+                        ? 'bg-amber-500 text-white shadow-md shadow-amber-500/20' 
+                        : 'bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800';
+                    return `
+                        <button onclick="app.selectCategory('${cat.replace(/'/g, "\\'")}')" class="px-3.5 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all ${activeClasses}">
+                            ${cat}
+                        </button>
+                    `;
+                }).join('');
+            }
+
+            selectCategory(cat) {
+                this.selectedCategory = cat;
+                this.renderCategories();
+                this.filterHistory();
+            }
+
+            async generateNewSpark(forcedCategory = null) {
+                if (!this.apiKey) {
+                    this.openSettingsModal();
+                    this.showToast('Vnesite svoj Gemini API ključ za generiranje!', 'warning');
+                    return;
+                }
+
+                const generateBtn = document.getElementById('generateBtn');
+                generateBtn.disabled = true;
+                generateBtn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> <span>Generiram...</span>`;
+
+                // Show skeleton on card
+                document.getElementById('cardSkeleton').classList.remove('hidden');
+                document.getElementById('cardContent').classList.add('hidden');
+
+                const chosenCat = forcedCategory || (this.selectedCategory !== "Vse kategorije" ? this.selectedCategory : CATEGORIES[Math.floor(Math.random() * (CATEGORIES.length - 1)) + 1]);
+
+                // Context of recent titles to avoid duplicates
+                const recentTitles = this.items.slice(0, 20).map(i => i.naslov).join('; ');
+
+                const prompt = `Si strokovnjak za ustvarjanje navdihujočih, poljudnoznanstvenih in poučnih kratkih člankov v slovenščini.
+Ustvari eno 'Dnevno iskro' za kategorijo: "${chosenCat}".
+
+NAVODILA za vsebino:
+- Besedilo naj bo dolgo natanko med 120 in 220 besed.
+- Biti mora strokovno, a hkrati dostopno, zanimivo in praktično uporabno.
+- Zgoraj navedeni naslovi iz zgodovine (IZOGIBAJ SE PONAVLJANJU TEM): ${recentTitles}
+
+ODGOVOR MORA BITI IZKLJUČNO V VELJAVNEM JSON FORMATU s strukturo:
+{
+  "kategorija": "${chosenCat}",
+  "naslov": "Kratek, pritegljiv naslov",
+  "vsebina": "Zanimivo in poučno besedilo v slovenščini (120-220 besed)...",
+  "kljucne_besede": ["beseda1", "beseda2", "beseda3"]
+}`;
+
+                try {
+                    // EXACT URL AND MODEL SPECIFIED IN USER REQUIREMENT: gemini-3.1-flash-lite
+                    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${this.apiKey}`;
+
+                    const payload = {
+                        contents: [{ parts: [{ text: prompt }] }],
+                        generationConfig: {
+                            responseMimeType: "application/json",
+                            responseSchema: {
+                                type: "OBJECT",
+                                properties: {
+                                    kategorija: { type: "STRING" },
+                                    naslov: { type: "STRING" },
+                                    vsebina: { type: "STRING" },
+                                    kljucne_besede: {
+                                        type: "ARRAY",
+                                        items: { type: "STRING" }
+                                    }
+                                },
+                                required: ["kategorija", "naslov", "vsebina", "kljucne_besede"]
+                            }
+                        }
+                    };
+
+                    // Exponential backoff fetch
+                    let response;
+                    let delay = 1000;
+                    for (let i = 0; i < 3; i++) {
+                        try {
+                            response = await fetch(apiUrl, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify(payload)
+                            });
+                            if (response.ok) break;
+                        } catch (e) {
+                            if (i === 2) throw e;
+                        }
+                        await new Promise(r => setTimeout(r, delay));
+                        delay *= 2;
+                    }
+
+                    if (!response || !response.ok) {
+                        const errData = await response.text();
+                        throw new Error(`Napaka API (${response.status}): ${errData}`);
+                    }
+
+                    const resJson = await response.json();
+                    const textContent = resJson.candidates?.[0]?.content?.parts?.[0]?.text;
+
+                    if (!textContent) {
+                        throw new Error("Prazna vsebina v odgovoru Gemini API-ja.");
+                    }
+
+                    const sparkData = JSON.parse(textContent);
+
+                    const newSpark = {
+                        id: 'spark-' + Date.now(),
+                        date: new Date().toISOString().split('T')[0],
+                        kategorija: sparkData.kategorija || chosenCat,
+                        naslov: sparkData.naslov,
+                        vsebina: sparkData.vsebina,
+                        kljucne_besede: sparkData.kljucne_besede || [],
+                        favorite: false
+                    };
+
+                    // Add to beginning of items
+                    this.items.unshift(newSpark);
+                    if (this.items.length > 70) this.items.pop(); // Keep array at ~60-70 items
+
+                    this.saveItems();
+                    this.displayTodaySpark(newSpark);
+                    this.renderHistory();
+                    this.showToast('Nova iskra uspešno generirana!', 'success');
+
+                } catch (err) {
+                    console.error("API Error:", err);
+                    this.showToast('Napaka pri klicu Gemini API: ' + err.message, 'error');
+                    // Fallback to offline display if available
+                    if (this.items.length > 0) {
+                        this.displayTodaySpark(this.items[0]);
+                    }
+                } finally {
+                    generateBtn.disabled = false;
+                    generateBtn.innerHTML = `<i class="fa-solid fa-wand-magic-sparkles"></i> <span>Generiraj nov navdih</span>`;
+                }
+            }
+
+            checkDailyAutoGenerate() {
+                const todayStr = new Date().toISOString().split('T')[0];
+                document.getElementById('todaysDate').innerText = new Date().toLocaleDateString('sl-SI', { weekday: 'long', day: 'numeric', month: 'long' });
+
+                if (this.items.length > 0) {
+                    this.displayTodaySpark(this.items[0]);
+                }
+
+                // If new day and API key exists, auto generate
+                if (this.lastGeneratedDate !== todayStr) {
+                    if (this.apiKey) {
+                        this.generateNewSpark();
+                        this.lastGeneratedDate = todayStr;
+                        localStorage.setItem('dnevna_iskra_last_gen', todayStr);
+                    }
+                }
+            }
+
+            displayTodaySpark(spark) {
+                this.currentTodayItem = spark;
+                document.getElementById('cardSkeleton').classList.add('hidden');
+                const content = document.getElementById('cardContent');
+                content.classList.remove('hidden');
+
+                document.getElementById('sparkCategory').innerText = spark.kategorija;
+                document.getElementById('sparkTitle').innerText = spark.naslov;
+                document.getElementById('sparkBody').innerText = spark.vsebina;
+
+                // Estimate read time
+                const words = spark.vsebina.split(' ').length;
+                const minutes = Math.max(1, Math.ceil(words / 150));
+                document.getElementById('sparkReadTime').innerHTML = `<i class="fa-regular fa-clock mr-1"></i> ~${minutes} min branja`;
+
+                // Render keywords
+                const kwContainer = document.getElementById('sparkKeywords');
+                if (spark.kljucne_besede && spark.kljucne_besede.length > 0) {
+                    kwContainer.innerHTML = spark.kljucne_besede.map(kw => `
+                        <span class="px-2.5 py-1 rounded-md text-[11px] font-medium bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
+                            #${kw}
+                        </span>
+                    `).join('');
+                } else {
+                    kwContainer.innerHTML = '';
+                }
+
+                // Update bookmark icon
+                const favIcon = document.getElementById('favIcon');
+                favIcon.className = spark.favorite ? "fa-solid fa-bookmark text-lg text-amber-500" : "fa-regular fa-bookmark text-lg";
+            }
+
+            toggleFavoriteToday() {
+                if (!this.currentTodayItem) return;
+                this.currentTodayItem.favorite = !this.currentTodayItem.favorite;
+                document.getElementById('favIcon').className = this.currentTodayItem.favorite ? "fa-solid fa-bookmark text-lg text-amber-500" : "fa-regular fa-bookmark text-lg";
+                this.saveItems();
+                this.renderHistory();
+            }
+
+            shareSparkToday() {
+                if (!this.currentTodayItem) return;
+                const text = `${this.currentTodayItem.naslov}\n\n${this.currentTodayItem.vsebina}\n\n- Iz aplikacije Dnevna iskra`;
+                
+                if (navigator.share) {
+                    navigator.share({
+                        title: this.currentTodayItem.naslov,
+                        text: text
+                    }).catch(() => {});
+                } else {
+                    // Fallback copy using execCommand
+                    this.copyToClipboard(text);
+                    this.showToast('Kopirano v odložišče!', 'success');
+                }
+            }
+
+            copyToClipboard(text) {
+                const textarea = document.createElement('textarea');
+                textarea.value = text;
+                textarea.style.position = 'fixed';
+                document.body.appendChild(textarea);
+                textarea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textarea);
+            }
+
+            toggleSpeech() {
+                if (!this.currentTodayItem) return;
+
+                if (this.isSpeaking) {
+                    this.speechSynth.cancel();
+                    this.isSpeaking = false;
+                    document.getElementById('ttsIcon').className = "fa-solid fa-volume-high";
+                    document.getElementById('ttsText').innerText = "Poslušaj";
+                } else {
+                    const utterance = new SpeechSynthesisUtterance(this.currentTodayItem.naslov + ". " + this.currentTodayItem.vsebina);
+                    utterance.lang = 'sl-SI';
+                    utterance.rate = 0.95;
+
+                    utterance.onend = () => {
+                        this.isSpeaking = false;
+                        document.getElementById('ttsIcon').className = "fa-solid fa-volume-high";
+                        document.getElementById('ttsText').innerText = "Poslušaj";
+                    };
+
+                    this.speechSynth.speak(utterance);
+                    this.isSpeaking = true;
+                    document.getElementById('ttsIcon').className = "fa-solid fa-square-stop text-amber-500";
+                    document.getElementById('ttsText').innerText = "Ustavi";
+                }
+            }
+
+            toggleFavFilter() {
+                this.favFilterActive = !this.favFilterActive;
+                const btn = document.getElementById('favFilterBtn');
+                if (this.favFilterActive) {
+                    btn.classList.add('bg-amber-500', 'text-white');
+                    btn.classList.remove('bg-white', 'dark:bg-slate-900');
+                } else {
+                    btn.classList.remove('bg-amber-500', 'text-white');
+                    btn.classList.add('bg-white', 'dark:bg-slate-900');
+                }
+                this.filterHistory();
+            }
+
+            filterHistory() {
+                const query = document.getElementById('searchInput').value.toLowerCase();
+                const filtered = this.items.filter(item => {
+                    const matchesCategory = (this.selectedCategory === "Vse kategorije") || (item.kategorija === this.selectedCategory);
+                    const matchesQuery = item.naslov.toLowerCase().includes(query) || item.vsebina.toLowerCase().includes(query);
+                    const matchesFav = !this.favFilterActive || item.favorite;
+                    return matchesCategory && matchesQuery && matchesFav;
+                });
+                this.renderHistoryGrid(filtered);
+            }
+
+            renderHistory() {
+                this.filterHistory();
+            }
+
+            renderHistoryGrid(list) {
+                const grid = document.getElementById('historyGrid');
+                const empty = document.getElementById('emptyHistory');
+
+                if (list.length === 0) {
+                    grid.innerHTML = '';
+                    empty.classList.remove('hidden');
+                    return;
+                }
+
+                empty.classList.add('hidden');
+                grid.innerHTML = list.map(item => `
+                    <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm hover:shadow-md transition flex flex-col justify-between space-y-4">
+                        <div class="space-y-2">
+                            <div class="flex items-center justify-between text-xs">
+                                <span class="text-amber-600 dark:text-amber-400 font-medium px-2.5 py-0.5 rounded-full bg-amber-50 dark:bg-amber-950/60 border border-amber-200/50 dark:border-amber-900/50">
+                                    ${item.kategorija}
+                                </span>
+                                <span class="text-slate-400">${item.date}</span>
+                            </div>
+                            <h4 class="font-bold text-slate-900 dark:text-white text-base line-clamp-2">
+                                ${item.naslov}
+                            </h4>
+                            <p class="text-slate-600 dark:text-slate-400 text-xs line-clamp-3 leading-relaxed">
+                                ${item.vsebina}
+                            </p>
+                        </div>
+
+                        <div class="flex items-center justify-between pt-3 border-t border-slate-100 dark:border-slate-800/80">
+                            <button onclick="app.openDetailModal('${item.id}')" class="text-xs font-semibold text-amber-600 hover:text-amber-700 dark:text-amber-400 flex items-center space-x-1">
+                                <span>Beri naprej</span>
+                                <i class="fa-solid fa-arrow-right text-[10px]"></i>
+                            </button>
+
+                            <button onclick="app.toggleHistoryFav('${item.id}')" class="text-slate-400 hover:text-amber-500 transition">
+                                <i class="${item.favorite ? 'fa-solid fa-bookmark text-amber-500' : 'fa-regular fa-bookmark'}"></i>
+                            </button>
+                        </div>
+                    </div>
+                `).join('');
+            }
+
+            toggleHistoryFav(id) {
+                const item = this.items.find(i => i.id === id);
+                if (item) {
+                    item.favorite = !item.favorite;
+                    this.saveItems();
+                    this.filterHistory();
+                    if (this.currentTodayItem && this.currentTodayItem.id === id) {
+                        this.displayTodaySpark(item);
+                    }
+                }
+            }
+
+            openDetailModal(id) {
+                const item = this.items.find(i => i.id === id);
+                if (!item) return;
+
+                this.activeDetailItem = item;
+                document.getElementById('detailCategory').innerText = item.kategorija;
+                document.getElementById('detailDate').innerText = item.date;
+                document.getElementById('detailTitle').innerText = item.naslov;
+                document.getElementById('detailBody').innerText = item.vsebina;
+
+                const kwContainer = document.getElementById('detailKeywords');
+                if (item.kljucne_besede && item.kljucne_besede.length > 0) {
+                    kwContainer.innerHTML = item.kljucne_besede.map(kw => `
+                        <span class="px-2.5 py-1 rounded-md text-[11px] font-medium bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
+                            #${kw}
+                        </span>
+                    `).join('');
+                } else {
+                    kwContainer.innerHTML = '';
+                }
+
+                this.updateDetailFavBtn();
+                document.getElementById('detailModal').classList.remove('hidden');
+            }
+
+            closeDetailModal() {
+                document.getElementById('detailModal').classList.add('hidden');
+                this.activeDetailItem = null;
+            }
+
+            toggleDetailFav() {
+                if (!this.activeDetailItem) return;
+                this.activeDetailItem.favorite = !this.activeDetailItem.favorite;
+                this.saveItems();
+                this.updateDetailFavBtn();
+                this.renderHistory();
+            }
+
+            updateDetailFavBtn() {
+                if (!this.activeDetailItem) return;
+                const icon = document.getElementById('detailFavIcon');
+                icon.className = this.activeDetailItem.favorite ? "fa-solid fa-bookmark text-amber-500" : "fa-regular fa-bookmark";
+            }
+
+            copyDetailText() {
+                if (!this.activeDetailItem) return;
+                const text = `${this.activeDetailItem.naslov}\n\n${this.activeDetailItem.vsebina}`;
+                this.copyToClipboard(text);
+                this.showToast('Besedilo kopirano!', 'success');
+            }
+
+            openSettingsModal() {
+                document.getElementById('apiKeyInput').value = this.apiKey;
+                document.getElementById('settingsModal').classList.remove('hidden');
+            }
+
+            closeSettingsModal() {
+                document.getElementById('settingsModal').classList.add('hidden');
+            }
+
+            toggleKeyVisibility() {
+                const input = document.getElementById('apiKeyInput');
+                const icon = document.getElementById('eyeIcon');
+                if (input.type === 'password') {
+                    input.type = 'text';
+                    icon.className = 'fa-solid fa-eye-slash';
+                } else {
+                    input.type = 'password';
+                    icon.className = 'fa-solid fa-eye';
+                }
+            }
+
+            saveApiKey() {
+                const key = document.getElementById('apiKeyInput').value.trim();
+                this.apiKey = key;
+                localStorage.setItem('dnevna_iskra_apikey', key);
+                this.updateApiKeyBadge();
+                this.closeSettingsModal();
+                this.showToast('API ključ uspešno shranjen!', 'success');
+            }
+
+            saveItems() {
+                localStorage.setItem('dnevna_iskra_items', JSON.stringify(this.items));
+            }
+
+            showToast(message, type = 'info') {
+                const container = document.getElementById('toastContainer');
+                const toast = document.createElement('div');
+                
+                const bgColors = {
+                    success: 'bg-emerald-600 text-white',
+                    error: 'bg-red-600 text-white',
+                    warning: 'bg-amber-500 text-white',
+                    info: 'bg-slate-800 text-white'
+                };
+
+                toast.className = `px-4 py-3 rounded-2xl shadow-xl text-xs font-medium flex items-center space-x-2 transition-all transform translate-y-2 opacity-0 pointer-events-auto ${bgColors[type] || bgColors.info}`;
+                toast.innerHTML = `<span>${message}</span>`;
+
+                container.appendChild(toast);
+
+                requestAnimationFrame(() => {
+                    toast.classList.remove('translate-y-2', 'opacity-0');
+                });
+
+                setTimeout(() => {
+                    toast.classList.add('opacity-0', 'translate-y-2');
+                    setTimeout(() => toast.remove(), 300);
+                }, 3500);
+            }
+        }
+
+        let app;
+        window.onload = () => {
+            app = new App();
+        };
+    </script>
+</body>
+</html>
